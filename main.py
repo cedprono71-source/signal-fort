@@ -1,4 +1,4 @@
-from from fastapi import FastAPI
+from fastapi import FastAPI
 from contextlib import asynccontextmanager
 import logging
 
