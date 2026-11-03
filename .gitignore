@@ -1,1 +1,6 @@
+__pycache__/
+*.pyc
+football_history.db
+ml_model.joblib
+.env
 
