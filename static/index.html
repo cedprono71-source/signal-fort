@@ -419,4 +419,250 @@
                 card.className = 'match-card';
                 card.innerHTML = `
                     <div class="match-card-header"><div class="skeleton" style="width: 80px; height: 10px;"></div><div class="skeleton" style="width: 40px; height: 10px;"></div></div>
-                    <div class="match-row"><div class="team-info"><div class="skeleton" style="width: 32px; height: 32px; border-radius: 50%;"></div><div class="skeleton" style="width: 120px; height: 14px;"></div></div><div class="skeleton" style="width: 25px; height
+                    <div class="match-row"><div class="team-info"><div class="skeleton" style="width: 32px; height: 32px; border-radius: 50%;"></div><div class="skeleton" style="width: 120px; height: 14px;"></div></div><div class="skeleton" style="width: 25px; height: 20px;"></div></div>
+                    <div class="match-row"><div class="team-info"><div class="skeleton" style="width: 32px; height: 32px; border-radius: 50%;"></div><div class="skeleton" style="width: 120px; height: 14px;"></div></div><div class="skeleton" style="width: 25px; height: 20px;"></div></div>
+                    <div class="skeleton" style="width: 100%; height: 36px; margin-top: 10px; border-radius: 8px;"></div>
+                `;
+                container.appendChild(card);
+            }
+        }
+
+        async function loadFootMatches(isBackground = false) {
+            if (!cachedFootMatches[selectedFootDate] && !isBackground) {
+                renderSkeletons();
+            }
+            try {
+                const res = await fetch(`/api/matches/foot?date=${selectedFootDate}`);
+                const data = await res.json();
+                cachedFootMatches[selectedFootDate] = data.matches || [];
+                renderFootMatches();
+                precomputeListSignals(cachedFootMatches[selectedFootDate]);
+            } catch (err) {
+                if (!isBackground) {
+                    cachedFootMatches[selectedFootDate] = [];
+                    renderFootMatches();
+                }
+            }
+        }
+
+        function getLeagueCode(leagueName) {
+            const mapping = {
+                "Premier League": "eng.1", "EFL Championship": "eng.2",
+                "La Liga": "esp.1", "Segunda División": "esp.2",
+                "Serie A": "ita.1", "Serie B": "ita.2",
+                "Bundesliga": "ger.1", "2. Bundesliga": "ger.2",
+                "Ligue 1": "fra.1", "Ligue 2": "fra.2",
+                "Eredivisie": "ned.1", "Liga Portugal": "por.1",
+                "Jupiler Pro League": "bel.1", "Süper Lig": "tur.1",
+                "Championnat d'Argentine": "arg.1",
+                "Scottish Premiership": "sco.1", "UEFA Champions League": "uefa.champions",
+                "UEFA Europa League": "uefa.europa", "UEFA Conference League": "uefa.conf"
+            };
+            return mapping[leagueName] || "eng.1";
+        }
+
+        async function precomputeListSignals(matches) {
+            for (let m of matches) {
+                const cacheKey = `${m.home_team}-${m.away_team}`;
+                if (!matchSignalsCache[cacheKey]) {
+                    try {
+                        const res = await fetch('/predict/match/foot', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                home_team: m.home_team, 
+                                away_team: m.away_team,
+                                event_id: m.event_id,
+                                league_code: getLeagueCode(m.league)
+                            })
+                        });
+                        const data = await res.json();
+                        matchSignalsCache[cacheKey] = data.signal_analysis;
+                        
+                        const badgeEl = document.getElementById(`badge-${m.home_team}-${m.away_team}`.replace(/\s+/g, '-'));
+                        if (badgeEl) {
+                            const sig = data.signal_analysis;
+                            badgeEl.className = `list-signal-tag ${sig.strength.toLowerCase() === 'fort' ? 'fort' : (sig.strength.toLowerCase() === 'modéré' ? 'modere' : 'incertain')}`;
+                            badgeEl.innerText = sig.strength === 'FORT' ? '🔥 Fort' : (sig.strength === 'MODÉRÉ' ? '⚡ Modéré' : '• Neutre');
+                        }
+                    } catch (e) {}
+                }
+            }
+        }
+
+        function renderFootMatches() {
+            const container = document.getElementById('foot-matches');
+            const matches = cachedFootMatches[selectedFootDate];
+
+            if (!matches) {
+                loadFootMatches();
+                return;
+            }
+
+            if (matches.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 20px;">Aucun match de football trouvé.</p>';
+                return;
+            }
+
+            container.innerHTML = '';
+            matches.forEach(m => {
+                const cacheKey = `${m.home_team}-${m.away_team}`;
+                const cachedSig = matchSignalsCache[cacheKey];
+                
+                let badgeClass = 'list-signal-tag incertain';
+                let badgeText = '• Analyse...';
+                if (cachedSig) {
+                    if (cachedSig.strength === 'FORT') { badgeClass = 'list-signal-tag fort'; badgeText = '🔥 Fort'; }
+                    else if (cachedSig.strength === 'MODÉRÉ') { badgeClass = 'list-signal-tag modere'; badgeText = '⚡ Modéré'; }
+                    else { badgeClass = 'list-signal-tag incertain'; badgeText = '• Neutre'; }
+                }
+
+                const uniqueBadgeId = `badge-${m.home_team}-${m.away_team}`.replace(/\s+/g, '-');
+
+                const card = document.createElement('div');
+                card.className = 'match-card';
+                card.innerHTML = `
+                    <div class="match-card-header">
+                        <span>${m.league || 'FOOTBALL'}</span>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span id="${uniqueBadgeId}" class="${badgeClass}">${badgeText}</span>
+                            <span>${m.game_state}</span>
+                        </div>
+                    </div>
+                    <div class="match-row">
+                        <div class="team-info"><img src="${m.home_logo || ''}" class="team-logo" onerror="this.style.display='none'"><span>${m.home_team}</span></div>
+                        <span class="match-score">${m.home_score !== null ? m.home_score : '-'}</span>
+                    </div>
+                    <div class="match-row">
+                        <div class="team-info"><img src="${m.away_logo || ''}" class="team-logo" onerror="this.style.display='none'"><span>${m.away_team}</span></div>
+                        <span class="match-score">${m.away_score !== null ? m.away_score : '-'}</span>
+                    </div>
+                    <button class="prono-btn" onclick="openFootProno('${m.home_team}', '${m.away_team}', '${m.event_id}', '${m.league}')">⚡ PRONO</button>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        async function openFootProno(home, away, eventId, leagueName) {
+            const modal = document.getElementById('prono-modal');
+            const title = document.getElementById('modal-match-title');
+            const body = document.getElementById('modal-body');
+
+            title.innerText = `${home} vs ${away}`;
+            body.innerHTML = '<p style="text-align: center; color: var(--text-muted);">Analyse en cours...</p>';
+            modal.style.display = 'flex';
+
+            const leagueCode = getLeagueCode(leagueName);
+
+            try {
+                const res = await fetch('/predict/match/foot', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        home_team: home, 
+                        away_team: away,
+                        event_id: eventId,
+                        league_code: leagueCode
+                    })
+                });
+                const data = await res.json();
+                const h = data.probabilities.home_win;
+                const d = data.probabilities.draw;
+                const a = data.probabilities.away_win;
+
+                const sig = data.signal_analysis;
+                let tagClass = 'incertain';
+                if (sig.strength === 'FORT') tagClass = 'fort';
+                else if (sig.strength === 'MODÉRÉ') tagClass = 'modere';
+
+                const g = data.goalscorers;
+
+                let topScoresHtml = '';
+                if (data.top_exact_scores && data.top_exact_scores.length > 0) {
+                    topScoresHtml = `
+                        <div class="modal-section">
+                            <div class="modal-section-title">🎯 Top 3 Scores Exacts</div>
+                            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                                ${data.top_exact_scores.map(s => `<span style="background: #0d0607; border: 1px solid var(--border-color); padding: 4px 8px; border-radius: 6px; font-size: 0.85em;">${s.score} (<strong style="color: var(--gold-color);">${s.probability}%</strong>)</span>`).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                body.innerHTML = `
+                    <div class="signal-badge-box">
+                        <div>
+                            <div style="font-size: 0.75em; color: var(--text-muted); text-transform: uppercase;">Consensus Modèle</div>
+                            <div style="font-size: 0.9em; font-weight: bold; margin-top: 2px; color: var(--gold-color);">Indice : ${sig.confidence_index}%</div>
+                        </div>
+                        <span class="signal-tag ${tagClass}">${sig.badge}</span>
+                    </div>
+
+                    <div class="modal-section">
+                        <div class="modal-section-title">📊 Probabilités (Score : ${data.predicted_score})</div>
+                        <div class="prob-bar-container">
+                            <div class="prob-info-row"><span>Victoire ${home}</span><span style="color: var(--home-color); font-weight: bold;">${h}%</span></div>
+                            <div class="custom-progress-bg"><div class="custom-progress-fill" style="width: ${h}%; background-color: var(--home-color);"></div></div>
+                        </div>
+                        <div class="prob-bar-container" style="margin-top: 8px;">
+                            <div class="prob-info-row"><span>Match Nul</span><span style="color: var(--draw-color); font-weight: bold;">${d}%</span></div>
+                            <div class="custom-progress-bg"><div class="custom-progress-fill" style="width: ${d}%; background-color: var(--draw-color);"></div></div>
+                        </div>
+                        <div class="prob-bar-container" style="margin-top: 8px;">
+                            <div class="prob-info-row"><span>Victoire ${away}</span><span style="color: var(--away-color); font-weight: bold;">${a}%</span></div>
+                            <div class="custom-progress-bg"><div class="custom-progress-fill" style="width: ${a}%; background-color: var(--away-color);"></div></div>
+                        </div>
+                    </div>
+
+                    ${topScoresHtml}
+
+                    <div class="modal-section">
+                        <div class="modal-section-title">⚽ Options de Paris</div>
+                        <div class="prob-info-row" style="margin-bottom: 6px;"><span>BTTS (Les deux équipes marquent)</span><strong style="color: var(--gold-color);">${data.btts.yes_prob}%</strong></div>
+                        <div class="prob-info-row"><span>Plus de 2.5 buts (Over)</span><strong style="color: var(--gold-color);">${data.over_under_2_5.over_prob}%</strong></div>
+                    </div>
+
+                    <div class="modal-section">
+                        <div class="modal-section-title">🎯 Pépites Buteurs (Anytime)</div>
+                        <div class="prob-info-row" style="margin-bottom: 6px;">
+                            <span>👤 ${home} (${g.home_player})</span>
+                            <strong style="color: var(--home-color);">${g.home_player_prob}%</strong>
+                        </div>
+                        <div class="prob-info-row">
+                            <span>👤 ${away} (${g.away_player})</span>
+                            <strong style="color: var(--away-color);">${g.away_player_prob}%</strong>
+                        </div>
+                    </div>
+
+                    <div class="modal-section">
+                        <div class="modal-section-title">⏱️ 1ère Mi-Temps</div>
+                        <div class="prob-info-row" style="margin-bottom: 6px;"><span>Score HT estimé</span><strong>${data.first_half.predicted_ht_score}</strong></div>
+                        <div class="prob-info-row" style="margin-bottom: 6px;"><span>Probabilité But MT (>0.5)</span><strong style="color: var(--gold-color);">${data.first_half.over_0_5_prob}%</strong></div>
+                        <div><span class="badge-conseil">${data.first_half.action_conseillee}</span></div>
+                    </div>
+
+                    <div class="modal-section">
+                        <div class="modal-section-title">🟨 Cartons Jaunes</div>
+                        <div class="prob-info-row" style="margin-bottom: 6px;"><span>Total attendu</span><strong>${data.yellow_cards.expected_total} cartons</strong></div>
+                        <div class="prob-info-row" style="margin-bottom: 6px;"><span>Probabilité > 4.5 cartons</span><strong style="color: var(--gold-color);">${data.yellow_cards.over_4_5_prob}%</strong></div>
+                        <div style="font-size: 0.8em; color: var(--text-muted); margin-top: 4px;">
+                            Moyenne Domicile : ${data.yellow_cards.home_team_avg} | Extérieur : ${data.yellow_cards.away_team_avg}
+                        </div>
+                    </div>
+                `;
+            } catch (err) {
+                body.innerHTML = '<p style="color: var(--accent-color); text-align: center;">Erreur lors du chargement des pronostics.</p>';
+            }
+        }
+
+        window.onload = () => {
+            buildCalendar();
+            loadFootMatches();
+
+            setInterval(() => {
+                loadFootMatches(true);
+            }, 60000);
+        };
+    </script>
+</body>
+</html>
