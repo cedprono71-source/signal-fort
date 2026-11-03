@@ -1,13 +1,7 @@
-fastfastapi
+fastapi
 uvicorn
 pandas
 scikit-learn
 numpy
-api
-uvicorn
-requests
-cachetools
-pydantic
-joblib
-scikit-learn
+
 
