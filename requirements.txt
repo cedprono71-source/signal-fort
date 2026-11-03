@@ -1,4 +1,9 @@
-fastapi
+fastfastapi
+uvicorn
+pandas
+scikit-learn
+numpy
+api
 uvicorn
 requests
 cachetools
