@@ -1,1 +1,668 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signal Fort - Prédictions Football Pro (Scorpion)</title>
+    <style>
+        :root {
+            --bg-color: #030712; /* Noir espace / cosmos */
+            --card-bg: #0f172a;  /* Bleu nuit sombre */
+            --accent-color: #2563eb; /* Bleu électrique du Scorpion */
+            --accent-hover: #3b82f6; /* Bleu électrique lumineux */
+            --gold-color: #fbbf24; /* Or / Ambre de la queue du scorpion */
+            --gold-light: #fde047;
+            --text-color: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: #1e293b;
+            --home-color: #38bdf8;
+            --draw-color: #fbbf24;
+            --away-color: #ef4444;
+        }
 
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 12px;
+            max-width: 480px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 12px;
+        }
+
+        header h1 {
+            color: var(--gold-color);
+            margin: 0;
+            font-size: 1.4em;
+            text-shadow: 0 0 10px rgba(251, 191, 36, 0.3);
+        }
+
+        .flashscore-calendar {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            padding-bottom: 8px;
+            margin-bottom: 15px;
+            scrollbar-width: none;
+        }
+        .flashscore-calendar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .cal-day-btn {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            padding: 8px 10px;
+            border-radius: 10px;
+            cursor: pointer;
+            text-align: center;
+            min-width: 55px;
+            flex-shrink: 0;
+            transition: all 0.2s;
+        }
+
+        .cal-day-btn.active {
+            background-color: var(--accent-color);
+            border-color: var(--accent-hover);
+            color: #fff;
+            font-weight: bold;
+            box-shadow: 0 0 12px rgba(37, 99, 235, 0.5);
+        }
+
+        .cal-day-name {
+            font-size: 0.7em;
+            text-transform: uppercase;
+        }
+
+        .cal-day-date {
+            font-size: 0.9em;
+            margin-top: 2px;
+        }
+
+        .match-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 12px 15px;
+            margin-bottom: 12px;
+            position: relative;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+        }
+
+        .match-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75em;
+            color: var(--gold-color);
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+
+        .list-signal-tag {
+            font-size: 0.65em;
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .list-signal-tag.fort { background-color: var(--gold-color); color: #030712; font-weight: 900; }
+        .list-signal-tag.modere { background-color: var(--accent-color); color: #fff; }
+        .list-signal-tag.incertain { background-color: #1e293b; color: var(--text-muted); }
+
+        .match-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+            font-size: 0.95em;
+            font-weight: 500;
+        }
+
+        .team-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .team-logo {
+            width: 32px;
+            height: 32px;
+            object-fit: contain;
+            flex-shrink: 0;
+        }
+
+        .match-score {
+            font-weight: bold;
+            font-size: 1.15em;
+            color: var(--gold-color);
+        }
+
+        .prono-btn {
+            width: 100%;
+            background: linear-gradient(135deg, var(--accent-color), #1d4ed8);
+            color: #fff;
+            border: 1px solid var(--accent-hover);
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 0.9em;
+            cursor: pointer;
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            transition: all 0.2s;
+            box-shadow: 0 0 15px rgba(37, 99, 235, 0.4);
+        }
+
+        .prono-btn:hover {
+            background: linear-gradient(135deg, var(--accent-hover), #2563eb);
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.6);
+        }
+
+        /* --- FENÊTRE MODALE --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(3, 7, 18, 0.9);
+            backdrop-filter: blur(8px);
+            display: none;
+            justify-content: center;
+            align-items: flex-end;
+            z-index: 1000;
+        }
+
+        .modal-container {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-top: 2px solid var(--accent-color);
+            border-top-left-radius: 20px;
+            border-top-right-radius: 20px;
+            width: 100%;
+            max-width: 480px;
+            max-height: 85vh;
+            overflow-y: auto;
+            padding: 20px;
+            box-sizing: border-box;
+            animation: slideUp 0.3s ease-out;
+            box-shadow: 0 -10px 25px rgba(0, 0, 0, 0.5);
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 12px;
+            margin-bottom: 15px;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 1.1em;
+            color: var(--gold-color);
+        }
+
+        .close-modal-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.4em;
+            cursor: pointer;
+        }
+
+        .modal-section {
+            background-color: #030712;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 12px 15px;
+            margin-bottom: 12px;
+        }
+
+        .modal-section-title {
+            font-size: 0.8em;
+            text-transform: uppercase;
+            color: var(--gold-color);
+            margin-bottom: 8px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+
+        .signal-badge-box {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(135deg, #0f172a 0%, #030712 100%);
+            border: 1px solid var(--accent-color);
+            border-radius: 10px;
+            padding: 10px 14px;
+            margin-bottom: 12px;
+            box-shadow: 0 0 10px rgba(37, 99, 235, 0.2);
+        }
+        .signal-tag {
+            font-size: 0.85em;
+            font-weight: bold;
+            padding: 4px 10px;
+            border-radius: 6px;
+        }
+        .signal-tag.fort { background-color: var(--gold-color); color: #030712; }
+        .signal-tag.modere { background-color: var(--accent-color); color: #fff; }
+        .signal-tag.incertain { background-color: #334155; color: #fff; }
+
+        .prob-bar-container {
+            margin-bottom: 10px;
+        }
+
+        .prob-bar-container:last-child {
+            margin-bottom: 0;
+        }
+
+        .prob-info-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85em;
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+
+        .custom-progress-bg {
+            background-color: #1e293b;
+            height: 6px;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .custom-progress-fill {
+            height: 100%;
+            border-radius: 3px;
+        }
+
+        .badge-conseil {
+            display: inline-block;
+            background: var(--accent-color);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.78em;
+            margin-top: 6px;
+            font-weight: bold;
+        }
+
+        .modal-close-bottom-btn {
+            width: 100%;
+            background-color: #1e293b;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 12px;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 0.95em;
+            cursor: pointer;
+            margin-top: 5px;
+            margin-bottom: 10px;
+            transition: background 0.2s;
+        }
+
+        .modal-close-bottom-btn:hover {
+            background-color: #334155;
+        }
+
+        @keyframes pulseSkeleton {
+            0% { opacity: 0.4; }
+            50% { opacity: 0.8; }
+            100% { opacity: 0.4; }
+        }
+        .skeleton {
+            background-color: #1e293b;
+            border-radius: 6px;
+            animation: pulseSkeleton 1.5s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>⚡ SCORPIO 13 - Football Pro</h1>
+    </header>
+
+    <div id="sport-foot">
+        <div id="foot-calendar" class="flashscore-calendar"></div>
+        <div id="foot-matches"></div>
+    </div>
+
+    <!-- FENÊTRE MODALE -->
+    <div id="prono-modal" class="modal-overlay" onclick="closeModalOnOutside(event)">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2 id="modal-match-title">Analyse Match</h2>
+                <button class="close-modal-btn" onclick="closeModal()">×</button>
+            </div>
+            <div id="modal-body"></div>
+            <button class="modal-close-bottom-btn" onclick="closeModal()">Fermer</button>
+        </div>
+    </div>
+
+    <script>
+        let selectedFootDate = new Date().toISOString().split('T')[0];
+        let cachedFootMatches = {};
+        let matchSignalsCache = {};
+
+        function buildCalendar() {
+            const container = document.getElementById('foot-calendar');
+            container.innerHTML = '';
+
+            const today = new Date();
+            for (let i = -3; i <= 3; i++) {
+                const d = new Date(today);
+                d.setDate(today.getDate() + i);
+                const dateStr = d.toISOString().split('T')[0];
+
+                const dayName = d.toLocaleDateString('fr-FR', { weekday: 'short' }).replace('.', '');
+                const dayDate = d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'numeric' });
+
+                const btn = document.createElement('button');
+                btn.className = 'cal-day-btn';
+                if (dateStr === selectedFootDate) {
+                    btn.classList.add('active');
+                }
+
+                btn.innerHTML = `
+                    <div class="cal-day-name">${i === 0 ? 'AJD' : dayName}</div>
+                    <div class="cal-day-date">${dayDate}</div>
+                `;
+
+                btn.onclick = () => {
+                    selectedFootDate = dateStr;
+                    loadFootMatches();
+                    buildCalendar();
+                };
+                container.appendChild(btn);
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('prono-modal').style.display = 'none';
+        }
+
+        function closeModalOnOutside(event) {
+            if (event.target.id === 'prono-modal') {
+                closeModal();
+            }
+        }
+
+        function renderSkeletons() {
+            const container = document.getElementById('foot-matches');
+            container.innerHTML = '';
+            for (let i = 0; i < 3; i++) {
+                const card = document.createElement('div');
+                card.className = 'match-card';
+                card.innerHTML = `
+                    <div class="match-card-header"><div class="skeleton" style="width: 80px; height: 10px;"></div><div class="skeleton" style="width: 40px; height: 10px;"></div></div>
+                    <div class="match-row"><div class="team-info"><div class="skeleton" style="width: 32px; height: 32px; border-radius: 50%;"></div><div class="skeleton" style="width: 120px; height: 14px;"></div></div><div class="skeleton" style="width: 25px; height: 20px;"></div></div>
+                    <div class="match-row"><div class="team-info"><div class="skeleton" style="width: 32px; height: 32px; border-radius: 50%;"></div><div class="skeleton" style="width: 120px; height: 14px;"></div></div><div class="skeleton" style="width: 25px; height: 20px;"></div></div>
+                    <div class="skeleton" style="width: 100%; height: 36px; margin-top: 10px; border-radius: 8px;"></div>
+                `;
+                container.appendChild(card);
+            }
+        }
+
+        async function loadFootMatches(isBackground = false) {
+            if (!cachedFootMatches[selectedFootDate] && !isBackground) {
+                renderSkeletons();
+            }
+            try {
+                const res = await fetch(`/api/matches/foot?date=${selectedFootDate}`);
+                const data = await res.json();
+                cachedFootMatches[selectedFootDate] = data.matches || [];
+                renderFootMatches();
+                precomputeListSignals(cachedFootMatches[selectedFootDate]);
+            } catch (err) {
+                if (!isBackground) {
+                    cachedFootMatches[selectedFootDate] = [];
+                    renderFootMatches();
+                }
+            }
+        }
+
+        function getLeagueCode(leagueName) {
+            const mapping = {
+                "Premier League": "eng.1", "EFL Championship": "eng.2",
+                "La Liga": "esp.1", "Segunda División": "esp.2",
+                "Serie A": "ita.1", "Serie B": "ita.2",
+                "Bundesliga": "ger.1", "2. Bundesliga": "ger.2",
+                "Ligue 1": "fra.1", "Ligue 2": "fra.2",
+                "Eredivisie": "ned.1", "Liga Portugal": "por.1",
+                "Jupiler Pro League": "bel.1", "Süper Lig": "tur.1",
+                "Championnat d'Argentine": "arg.1",
+                "Scottish Premiership": "sco.1", "UEFA Champions League": "uefa.champions",
+                "UEFA Europa League": "uefa.europa", "UEFA Conference League": "uefa.conf"
+            };
+            return mapping[leagueName] || "eng.1";
+        }
+
+        async function precomputeListSignals(matches) {
+            for (let m of matches) {
+                const cacheKey = `${m.home_team}-${m.away_team}`;
+                if (!matchSignalsCache[cacheKey]) {
+                    try {
+                        const res = await fetch('/predict/match/foot', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                home_team: m.home_team, 
+                                away_team: m.away_team,
+                                event_id: m.event_id,
+                                league_code: getLeagueCode(m.league)
+                            })
+                        });
+                        const data = await res.json();
+                        matchSignalsCache[cacheKey] = data.signal_analysis;
+                        
+                        const badgeEl = document.getElementById(`badge-${m.home_team}-${m.away_team}`.replace(/\s+/g, '-'));
+                        if (badgeEl) {
+                            const sig = data.signal_analysis;
+                            badgeEl.className = `list-signal-tag ${sig.strength.toLowerCase() === 'fort' ? 'fort' : (sig.strength.toLowerCase() === 'modéré' ? 'modere' : 'incertain')}`;
+                            badgeEl.innerText = sig.strength === 'FORT' ? '🔥 Fort' : (sig.strength === 'MODÉRÉ' ? '⚡ Modéré' : '• Neutre');
+                        }
+                    } catch (e) {}
+                }
+            }
+        }
+
+        function renderFootMatches() {
+            const container = document.getElementById('foot-matches');
+            const matches = cachedFootMatches[selectedFootDate];
+
+            if (!matches) {
+                loadFootMatches();
+                return;
+            }
+
+            if (matches.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 20px;">Aucun match de football trouvé.</p>';
+                return;
+            }
+
+            container.innerHTML = '';
+            matches.forEach(m => {
+                const cacheKey = `${m.home_team}-${m.away_team}`;
+                const cachedSig = matchSignalsCache[cacheKey];
+                
+                let badgeClass = 'list-signal-tag incertain';
+                let badgeText = '• Analyse...';
+                if (cachedSig) {
+                    if (cachedSig.strength === 'FORT') { badgeClass = 'list-signal-tag fort'; badgeText = '🔥 Fort'; }
+                    else if (cachedSig.strength === 'MODÉRÉ') { badgeClass = 'list-signal-tag modere'; badgeText = '⚡ Modéré'; }
+                    else { badgeClass = 'list-signal-tag incertain'; badgeText = '• Neutre'; }
+                }
+
+                const uniqueBadgeId = `badge-${m.home_team}-${m.away_team}`.replace(/\s+/g, '-');
+
+                const card = document.createElement('div');
+                card.className = 'match-card';
+                card.innerHTML = `
+                    <div class="match-card-header">
+                        <span>${m.league || 'FOOTBALL'}</span>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span id="${uniqueBadgeId}" class="${badgeClass}">${badgeText}</span>
+                            <span>${m.game_state}</span>
+                        </div>
+                    </div>
+                    <div class="match-row">
+                        <div class="team-info"><img src="${m.home_logo || ''}" class="team-logo" onerror="this.style.display='none'"><span>${m.home_team}</span></div>
+                        <span class="match-score">${m.home_score !== null ? m.home_score : '-'}</span>
+                    </div>
+                    <div class="match-row">
+                        <div class="team-info"><img src="${m.away_logo || ''}" class="team-logo" onerror="this.style.display='none'"><span>${m.away_team}</span></div>
+                        <span class="match-score">${m.away_score !== null ? m.away_score : '-'}</span>
+                    </div>
+                    <button class="prono-btn" onclick="openFootProno('${m.home_team}', '${m.away_team}', '${m.event_id}', '${m.league}')">⚡ PRONO</button>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        async function openFootProno(home, away, eventId, leagueName) {
+            const modal = document.getElementById('prono-modal');
+            const title = document.getElementById('modal-match-title');
+            const body = document.getElementById('modal-body');
+
+            title.innerText = `${home} vs ${away}`;
+            body.innerHTML = '<p style="text-align: center; color: var(--text-muted);">Analyse en cours...</p>';
+            modal.style.display = 'flex';
+
+            const leagueCode = getLeagueCode(leagueName);
+
+            try {
+                const res = await fetch('/predict/match/foot', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        home_team: home, 
+                        away_team: away,
+                        event_id: eventId,
+                        league_code: leagueCode
+                    })
+                });
+                const data = await res.json();
+                const h = data.probabilities.home_win;
+                const d = data.probabilities.draw;
+                const a = data.probabilities.away_win;
+
+                const sig = data.signal_analysis;
+                let tagClass = 'incertain';
+                if (sig.strength === 'FORT') tagClass = 'fort';
+                else if (sig.strength === 'MODÉRÉ') tagClass = 'modere';
+
+                const g = data.goalscorers;
+
+                let topScoresHtml = '';
+                if (data.top_exact_scores && data.top_exact_scores.length > 0) {
+                    topScoresHtml = `
+                        <div class="modal-section">
+                            <div class="modal-section-title">🎯 Top 3 Scores Exacts</div>
+                            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                                ${data.top_exact_scores.map(s => `<span style="background: #030712; border: 1px solid var(--border-color); padding: 4px 8px; border-radius: 6px; font-size: 0.85em;">${s.score} (<strong style="color: var(--gold-color);">${s.probability}%</strong>)</span>`).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                body.innerHTML = `
+                    <div class="signal-badge-box">
+                        <div>
+                            <div style="font-size: 0.75em; color: var(--text-muted); text-transform: uppercase;">Consensus Modèle</div>
+                            <div style="font-size: 0.9em; font-weight: bold; margin-top: 2px; color: var(--gold-color);">Indice : ${sig.confidence_index}%</div>
+                        </div>
+                        <span class="signal-tag ${tagClass}">${sig.badge}</span>
+                    </div>
+
+                    <div class="modal-section">
+                        <div class="modal-section-title">📊 Probabilités (Score : ${data.predicted_score})</div>
+                        <div class="prob-bar-container">
+                            <div class="prob-info-row"><span>Victoire ${home}</span><span style="color: var(--home-color); font-weight: bold;">${h}%</span></div>
+                            <div class="custom-progress-bg"><div class="custom-progress-fill" style="width: ${h}%; background-color: var(--home-color);"></div></div>
+                        </div>
+                        <div class="prob-bar-container" style="margin-top: 8px;">
+                            <div class="prob-info-row"><span>Match Nul</span><span style="color: var(--draw-color); font-weight: bold;">${d}%</span></div>
+                            <div class="custom-progress-bg"><div class="custom-progress-fill" style="width: ${d}%; background-color: var(--draw-color);"></div></div>
+                        </div>
+                        <div class="prob-bar-container" style="margin-top: 8px;">
+                            <div class="prob-info-row"><span>Victoire ${away}</span><span style="color: var(--away-color); font-weight: bold;">${a}%</span></div>
+                            <div class="custom-progress-bg"><div class="custom-progress-fill" style="width: ${a}%; background-color: var(--away-color);"></div></div>
+                        </div>
+                    </div>
+
+                    ${topScoresHtml}
+
+                    <div class="modal-section">
+                        <div class="modal-section-title">⚽ Options de Paris</div>
+                        <div class="prob-info-row" style="margin-bottom: 6px;"><span>BTTS (Les deux équipes marquent)</span><strong style="color: var(--gold-color);">${data.btts.yes_prob}%</strong></div>
+                        <div class="prob-info-row"><span>Plus de 2.5 buts (Over)</span><strong style="color: var(--gold-color);">${data.over_under_2_5.over_prob}%</strong></div>
+                    </div>
+
+                    <div class="modal-section">
+                        <div class="modal-section-title">🎯 Pépites Buteurs (Anytime)</div>
+                        <div class="prob-info-row" style="margin-bottom: 6px;">
+                            <span>👤 ${home} (${g.home_player})</span>
+                            <strong style="color: var(--home-color);">${g.home_player_prob}%</strong>
+                        </div>
+                        <div class="prob-info-row">
+                            <span>👤 ${away} (${g.away_player})</span>
+                            <strong style="color: var(--away-color);">${g.away_player_prob}%</strong>
+                        </div>
+                    </div>
+
+                    <div class="modal-section">
+                        <div class="modal-section-title">⏱️ 1ère Mi-Temps</div>
+                        <div class="prob-info-row" style="margin-bottom: 6px;"><span>Score HT estimé</span><strong>${data.first_half.predicted_ht_score}</strong></div>
+                        <div class="prob-info-row" style="margin-bottom: 6px;"><span>Probabilité But MT (>0.5)</span><strong style="color: var(--gold-color);">${data.first_half.over_0_5_prob}%</strong></div>
+                        <div><span class="badge-conseil">${data.first_half.action_conseillee}</span></div>
+                    </div>
+
+                    <div class="modal-section">
+                        <div class="modal-section-title">🟨 Cartons Jaunes</div>
+                        <div class="prob-info-row" style="margin-bottom: 6px;"><span>Total attendu</span><strong>${data.yellow_cards.expected_total} cartons</strong></div>
+                        <div class="prob-info-row" style="margin-bottom: 6px;"><span>Probabilité > 4.5 cartons</span><strong style="color: var(--gold-color);">${data.yellow_cards.over_4_5_prob}%</strong></div>
+                        <div style="font-size: 0.8em; color: var(--text-muted); margin-top: 4px;">
+                            Moyenne Domicile : ${data.yellow_cards.home_team_avg} | Extérieur : ${data.yellow_cards.away_team_avg}
+                        </div>
+                    </div>
+                `;
+            } catch (err) {
+                body.innerHTML = '<p style="color: #ef4444; text-align: center;">Erreur lors du chargement des pronostics.</p>';
+            }
+        }
+
+        window.onload = () => {
+            buildCalendar();
+            loadFootMatches();
+
+            setInterval(() => {
+                loadFootMatches(true);
+            }, 60000);
+        };
+    </script>
+</body>
+</html>
